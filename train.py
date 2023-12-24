@@ -1,6 +1,6 @@
 #train.py
 from dataloader import getDataset, getDataloaders
-from helpers.helper import check_cpu_memory, check_gpu_memory
+from helpers.helper import check_cpu_memory, check_gpu_memory, save_checkpoint, load_checkpoint
 
 import yaml
 import os
@@ -16,6 +16,8 @@ from transformers import get_scheduler
 from tqdm.auto import tqdm
 
 import torch
+from torch.cuda.amp import autocast
+from torch.cuda.amp import GradScaler 
 
 import psutil
 
@@ -38,10 +40,14 @@ def train(train_dataloader, trained_model_filename, yaml_data):
 	SEQ_LEN           = int(yaml_data['SEQ_LEN'])
 	BATCH_SIZE		  = int(yaml_data['BATCH_SIZE'])
 	OPTIMIZER_NAME    = yaml_data['OPTIMIZER_NAME']
+	OPT_LVL 		  = yaml_data['OPT_LEVEL']
+	PRECISION_TYPE    = yaml_data['PRECISION_TYPE']
+
 	device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 	
 	print(f"MODEL_NAME : {MODEL_NAME}\nNUM_EPOCHS : {NUM_EPOCHS} \nLR : {LR}\nSAVE_CHKPNT_EPOCH : {SAVE_CHKPNT_EPOCH} \
-	   MODEL_CHKPNT_DIR : {MODEL_CHKPNT_DIR}\nSEQ_LEN : {SEQ_LEN}\nBATCH_SIZE : {BATCH_SIZE}\nOPTIMIZER_NAME : {OPTIMIZER_NAME}\ndevice : {device}\n")
+	   MODEL_CHKPNT_DIR : {MODEL_CHKPNT_DIR}\nSEQ_LEN : {SEQ_LEN}\nBATCH_SIZE : {BATCH_SIZE}\nOPTIMIZER_NAME : {OPTIMIZER_NAME}\ndevice : {device}\nOPT_LEVEL : {OPT_LVL}\n\
+	   PRECISION_TYPE:{PRECISION_TYPE}\n")
 	
 	num_batches = len(train_dataloader)
 	step = 0
@@ -51,17 +57,21 @@ def train(train_dataloader, trained_model_filename, yaml_data):
 
 	print(f"\nloading model {MODEL_NAME} , optimizer and scheduler")
 
-	model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, low_cpu_mem_usage = True)
+	model = AutoModelForCausalLM.from_pretrained(MODEL_NAME) # , low_cpu_mem_usage = True
+	model.to(device)
 	num_training_steps = NUM_EPOCHS * num_batches
 	optimizer    = get_opt(model, OPTIMIZER_NAME, yaml_data)
 	lr_scheduler = get_schdlr(optimizer, num_training_steps)
+	scaler       = GradScaler(enabled = True)
+	# #amp initialization
+	# #avoiding as outputs.loss has unexpected behaviour 
+	# model, optimizer = amp.initialize(model, optimizer, opt_level = OPT_LVL)
 
 	if trained_model_filename != None:
 		model_chkpnt = os.path.join(yaml_data['MODEL_CHKPNT_DIR'], f'{trained_model_filename}.pth')  
 		model, optimizer, lr_scheduler = load_checkpoint(model, optimizer, lr_scheduler, model_chkpnt)	
 		print(f'{MODEL_NAME} loaded from {model_chkpnt}')
 
-	model.to(device)
 	model.train()
 	
 	# progress_bar = tqdm(range(num_training_steps))
@@ -77,21 +87,49 @@ def train(train_dataloader, trained_model_filename, yaml_data):
 				
 				batch = {k: v.to(device) for k, v in batch.items()}
 
-				forward_st = time.time()
-				outputs = model(**batch)
-				forward_et = time.time()
-				forward_total_time += (forward_et - forward_st)
+				if PRECISION_TYPE == 'MIXED':
+					with autocast(dtype = torch.float16, enabled = True):
+						forward_st = time.time()
+						outputs = model(**batch)
+						forward_et = time.time()
+						forward_total_time += (forward_et - forward_st)
+				elif PRECISION_TYPE == 'SINGLE':
+						forward_st = time.time()
+						outputs = model(**batch)
+						forward_et = time.time()
+						forward_total_time += (forward_et - forward_st)
 
 				loss = outputs.loss
+
 				running_loss += loss
 
+				# #avoiding as outputs.loss has unexpected behaviour 
+				# with amp.scale_loss(loss, optimizer) as scaled_loss:
+				# 	scaled_loss.backward()
+
 				backward_st = time.time()
-				loss.backward()
+				
+				if PRECISION_TYPE == 'MIXED':
+					scaler.scale(loss).backward() 
+				elif PRECISION_TYPE == 'SINGLE':
+					loss.backward()
+				
 				backward_et = time.time()
 				backward_total_time += (backward_et - backward_st)
 
-				optimizer.step()
-				lr_scheduler.step()
+				if PRECISION_TYPE == 'MIXED':
+					scaler.step(optimizer)
+					scale = scaler.get_scale()
+					scaler.update()
+					skip_lr_shdlr = (scale > scaler.get_scale()) # to avoid lr step in case of NaN gradients
+
+					if not skip_lr_shdlr : 
+						lr_scheduler.step()
+				
+				elif PRECISION_TYPE == 'SINGLE':
+					optimizer.step()
+					lr_scheduler.step()
+
 				optimizer.zero_grad()
 				
 				# progress_bar.update(1)
@@ -109,8 +147,6 @@ def train(train_dataloader, trained_model_filename, yaml_data):
 		
 		except RuntimeError as e:
 			print(f"RuntimeError : {e}")
-			
-		
 
 		end_time = time.time()
 		epoch_time = end_time - start_time
@@ -210,28 +246,6 @@ def config():
         yaml_data = yaml.safe_load(file)
 
     return yaml_data
-
-	
-def save_checkpoint(model, optimizer, lr_scheduler, checkpoint_path ):
-	torch.save({
-        'model_state_dict': model.state_dict(),
-		'optimizer_state_dict': optimizer.state_dict(),
-		'lr_state_dict' : lr_scheduler.state_dict()
-    }, checkpoint_path)
-
-	#report checkpoint size on-disk
-	size_in_bytes = os.path.getsize(checkpoint_path)
-	print(f"{checkpoint_path} : {size_in_bytes} bytes")
-
-
-def load_checkpoint(model, optimizer, lr_scheduler, checkpoint_path):
-	checkpoint = torch.load(checkpoint_path)
-	model.load_state_dict(checkpoint['model_state_dict'])
-	optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-	lr_scheduler.load_state_dict(checkpoint['lr_state_dict'])
-	
-	return model, optimizer, lr_scheduler
-
 
 def free_memory():
 	torch.cuda.empty_cache()

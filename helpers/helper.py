@@ -1,6 +1,7 @@
 #helper.py
 import torch
 import psutil
+import os
 
 def metric1():
 	pass
@@ -25,3 +26,24 @@ def check_cpu_memory():
 
 	print(f"CPU Memory Used: {cpu_mem} MB")
 	return cpu_mem
+
+
+def save_checkpoint(model, optimizer, lr_scheduler, checkpoint_path ):
+	torch.save({
+        'model_state_dict': model.state_dict(),
+		'optimizer_state_dict': optimizer.state_dict(),
+		'lr_state_dict' : lr_scheduler.state_dict()
+    }, checkpoint_path)
+
+	#report checkpoint size on-disk
+	size_in_bytes = os.path.getsize(checkpoint_path)
+	print(f"{checkpoint_path} : {size_in_bytes} bytes")
+
+
+def load_checkpoint(model, optimizer, lr_scheduler, checkpoint_path):
+	checkpoint = torch.load(checkpoint_path)
+	model.load_state_dict(checkpoint['model_state_dict'])
+	optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+	lr_scheduler.load_state_dict(checkpoint['lr_state_dict'])
+	
+	return model, optimizer, lr_scheduler
