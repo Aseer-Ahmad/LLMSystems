@@ -106,6 +106,7 @@ def train(train_dataloader, trained_model_filename, yaml_data):
 				# tf.summary.scalar('gpu_mem', gpu_mem, step = step)
 				# tf.summary.scalar('gpu_mem_max', gpu_mem_max, step = step)
 				# tf.summary.scalar('cpu_mem', cpu_mem, step = step)
+		
 		except RuntimeError as e:
 			print(f"RuntimeError : {e}")
 			
