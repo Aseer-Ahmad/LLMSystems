@@ -49,21 +49,21 @@ def train(train_dataloader, trained_model_filename, yaml_data):
 	forward_total_time, backward_total_time = 0, 0
 	running_loss = 0
 
-	print(f"\nloading model {MODEL_NAME}")
+	print(f"\nloading model {MODEL_NAME} , optimizer and scheduler")
+
 	model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, low_cpu_mem_usage = True)
-	
-	if trained_model_filename != None or trained_model_filename != '':
+	num_training_steps = NUM_EPOCHS * num_batches
+	optimizer    = get_opt(model, OPTIMIZER_NAME, yaml_data)
+	lr_scheduler = get_schdlr(optimizer, num_training_steps)
+
+	if trained_model_filename != None:
 		model_chkpnt = os.path.join(yaml_data['MODEL_CHKPNT_DIR'], f'{trained_model_filename}.pth')  
-		model = load_checkpoint(model, model_chkpnt)	
+		model, optimizer, lr_scheduler = load_checkpoint(model, optimizer, lr_scheduler, model_chkpnt)	
 		print(f'{MODEL_NAME} loaded from {model_chkpnt}')
 
 	model.to(device)
 	model.train()
 	
-	num_training_steps = NUM_EPOCHS * num_batches
-	optimizer    = get_opt(model, OPTIMIZER_NAME, yaml_data)
-	lr_scheduler = get_schdlr(optimizer, num_training_steps)
-
 	# progress_bar = tqdm(range(num_training_steps))
 	print("\nmodel, opt, schdl loaded")
 	print("\nbeginning training ...")
@@ -132,7 +132,7 @@ def train(train_dataloader, trained_model_filename, yaml_data):
 		check_gpu_memory()
 		check_cpu_memory()
 
-		print(f"lr schdl : {lr_scheduler}")
+		print(f"lr schdl : {lr_scheduler.state_dict()}")
 
 		#save checkpoint on disk 
 		if SAVE_CHKPNT_EPOCH is not None and epoch % SAVE_CHKPNT_EPOCH == 0:
@@ -224,10 +224,13 @@ def save_checkpoint(model, optimizer, lr_scheduler, checkpoint_path ):
 	print(f"{checkpoint_path} : {size_in_bytes} bytes")
 
 
-def load_checkpoint(model, checkpoint_path):
+def load_checkpoint(model, optimizer, lr_scheduler, checkpoint_path):
 	checkpoint = torch.load(checkpoint_path)
 	model.load_state_dict(checkpoint['model_state_dict'])
-	return model
+	optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+	lr_scheduler.load_state_dict(checkpoint['lr_state_dict'])
+	
+	return model, optimizer, lr_scheduler
 
 
 def free_memory():
@@ -244,7 +247,7 @@ def main():
 	print(yaml_data)
 
 	# set trained_model_filename if need to use a pretrained checkpoint ; else keep None
-	trained_model_filename = 'gpt2_chkpoint_5'
+	trained_model_filename = None
 
 	# load dataset
 	data = getDataset(yaml_data)
