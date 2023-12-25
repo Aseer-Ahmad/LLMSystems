@@ -1,17 +1,17 @@
 #helper.py
 import torch
+import torch
+from torch.ao.quantization import (
+  get_default_qconfig_mapping,
+  get_default_qat_qconfig_mapping,
+  QConfigMapping,
+)
+import torch.ao.quantization.quantize_fx as quantize_fx
+import copy
+
 import psutil
 import os
 
-def metric1():
-	pass
-	
-def metric2():
-	pass
-	
-def getMemInfo():
-	pass
-	
 def check_gpu_memory():
 	gpu_mem = torch.cuda.memory_allocated() / 1e6
 	gpu_mem_max = torch.cuda.max_memory_allocated() / 1e6
@@ -52,3 +52,30 @@ def load_checkpoint(model, optimizer, lr_scheduler, checkpoint_path):
 		lr_scheduler.load_state_dict(checkpoint['lr_state_dict'])
 	
 	return model, optimizer, lr_scheduler
+
+def FX_graph_mode_quantization(model, input):
+
+	# post training static quantization
+	example_batch = (input)
+	model_to_quantize = copy.deepcopy(model)
+	qconfig_mapping = get_default_qconfig_mapping("qnnpack")
+	model_to_quantize.eval()
+	# calibrate : pass through model_prepared example batch
+	# model(**example_batch)
+	model_prepared = quantize_fx.prepare_fx(model_to_quantize, qconfig_mapping, example_batch)
+	model_quantized = quantize_fx.convert_fx(model_prepared)
+
+	return model_quantized
+
+def eager_mode_quantization(model):
+	pass
+
+def metric1():
+	pass
+	
+def metric2():
+	pass
+	
+def getMemInfo():
+	pass
+	

@@ -1,6 +1,6 @@
 #train.py
 from dataloader import getDataset, getDataloaders
-from helpers.helper import check_cpu_memory, check_gpu_memory, save_checkpoint, load_checkpoint
+from helpers.helper import check_cpu_memory, check_gpu_memory, save_checkpoint, load_checkpoint, FX_graph_mode_quantization
 
 import yaml
 import os
@@ -284,11 +284,10 @@ def free_memory():
 def loadModel(yaml_data):
 	MODEL_NAME        = yaml_data['MODEL_NAME']
 	print(f"\nloading model {MODEL_NAME}")
-	model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, low_cpu_mem_usage = True)
+	model = AutoModelForCausalLM.from_pretrained(MODEL_NAME) # , low_cpu_mem_usage = True
 	return model
 
-def model_quantization():
-	pass
+
 
 def main():
 	yaml_data  = config()
@@ -300,9 +299,20 @@ def main():
 	# load dataset
 	data = getDataset(yaml_data)
 	train_dataloader, eval_dataloader = getDataloaders(data, yaml_data)
-	model = train(train_dataloader, trained_model_filename,  yaml_data)
+	
+	# train model
+	# model = train(train_dataloader, trained_model_filename,  yaml_data)
 	
 	# eval(model, eval_dataloader, trained_model_filename, yaml_data)
+
+	# quantization attempt
+	model = loadModel(yaml_data)
+	example_batch = next(iter(train_dataloader))
+	# del example_batch['input_ids']
+	# del example_batch['attention_mask']
+	# model_quantized = FX_graph_mode_quantization(model, example_batch)
+	print(model)
+
 
 if __name__ == '__main__':
 	main()

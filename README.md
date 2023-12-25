@@ -35,6 +35,7 @@ USEFUL LINKS :
 7. https://docs.nvidia.com/deeplearning/performance/mixed-precision-training/index.html <br>
 8. https://www.cerebras.net/machine-learning/to-bfloat-or-not-to-bfloat-that-is-the-question/#:~:text=bfloat16%20is%20a%2016%2Dbit,deep%20learning%20applications%20in%20mind. <br>
 9. https://github.com/NVIDIA/apex <br>
-10. 
+10. https://pytorch.org/docs/stable/quantization.html <br>
+11. 
 
 
