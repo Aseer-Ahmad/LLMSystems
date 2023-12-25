@@ -5,7 +5,7 @@ TOKENIZER  : gpt2
 DATASET_NAME  : databricks/databricks-dolly-15k
 features : ['instruction', 'context', 'response', 'category']
 
-NUM_EPOCHS : 5
+NUM_EPOCHS : 10
 LR         : 2e-5
 WEIGHT_DECAY : 0.01
 SEQ_LEN    : 128

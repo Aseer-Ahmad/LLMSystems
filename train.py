@@ -63,6 +63,7 @@ def train(train_dataloader, trained_model_filename, yaml_data):
 	optimizer    = get_opt(model, OPTIMIZER_NAME, yaml_data)
 	lr_scheduler = get_schdlr(optimizer, num_training_steps)
 	scaler       = GradScaler(enabled = True)
+	
 	# #amp initialization
 	# #avoiding as outputs.loss has unexpected behaviour 
 	# model, optimizer = amp.initialize(model, optimizer, opt_level = OPT_LVL)
@@ -267,7 +268,6 @@ def main():
 	data = getDataset(yaml_data)
 	train_dataloader, eval_dataloader = getDataloaders(data, yaml_data)
 	model = train(train_dataloader, trained_model_filename,  yaml_data)
-
 	
 	# eval(model, eval_dataloader, trained_model_filename, yaml_data)
 
