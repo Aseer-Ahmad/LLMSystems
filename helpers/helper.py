@@ -29,6 +29,7 @@ def check_cpu_memory():
 
 
 def save_checkpoint(model, optimizer, lr_scheduler, checkpoint_path ):
+	
 	torch.save({
         'model_state_dict': model.state_dict(),
 		'optimizer_state_dict': optimizer.state_dict(),
@@ -39,11 +40,15 @@ def save_checkpoint(model, optimizer, lr_scheduler, checkpoint_path ):
 	size_in_bytes = os.path.getsize(checkpoint_path)
 	print(f"{checkpoint_path} : {size_in_bytes} bytes")
 
+	return size_in_bytes
+
 
 def load_checkpoint(model, optimizer, lr_scheduler, checkpoint_path):
 	checkpoint = torch.load(checkpoint_path)
 	model.load_state_dict(checkpoint['model_state_dict'])
-	optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-	lr_scheduler.load_state_dict(checkpoint['lr_state_dict'])
+
+	if optimizer != None and lr_scheduler != None :
+		optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+		lr_scheduler.load_state_dict(checkpoint['lr_state_dict'])
 	
 	return model, optimizer, lr_scheduler

@@ -19,7 +19,6 @@ import torch
 from torch.cuda.amp import autocast
 from torch.cuda.amp import GradScaler 
 
-import psutil
 import pandas as pd
 
 log_dir = "logs"  # Specify the directory where you want to store the logs
@@ -30,7 +29,7 @@ PARENT_PATH  = os.getcwd()
 
 def train(train_dataloader, trained_model_filename, yaml_data):
 
-	print("\in train")
+	print("\nin train")
 	#arguments
 	MODEL_NAME        = yaml_data['MODEL_NAME']
 	NUM_EPOCHS        = int(yaml_data['NUM_EPOCHS'])
@@ -54,6 +53,9 @@ def train(train_dataloader, trained_model_filename, yaml_data):
 	epoch_total_time  = 0
 	forward_total_time, backward_total_time = 0, 0
 	running_loss = 0
+	tot_gpu_mem = 0
+	tot_cpu_mem = 0
+	df_list     = []
 
 	print(f"\nloading model {MODEL_NAME} , optimizer and scheduler")
 
@@ -70,7 +72,7 @@ def train(train_dataloader, trained_model_filename, yaml_data):
 
 	if trained_model_filename != None:
 		model_chkpnt = os.path.join(yaml_data['MODEL_CHKPNT_DIR'], f'{trained_model_filename}.pth')  
-		model, optimizer, lr_scheduler = load_checkpoint(model, optimizer, lr_scheduler, model_chkpnt)	
+		model , optimizer, lr_scheduler = load_checkpoint(model, optimizer, lr_scheduler, model_chkpnt)	
 		print(f'{MODEL_NAME} loaded from {model_chkpnt}')
 
 	model.train()
@@ -78,7 +80,7 @@ def train(train_dataloader, trained_model_filename, yaml_data):
 	# progress_bar = tqdm(range(num_training_steps))
 	print("\nmodel, opt, schdl loaded")
 	print("\nbeginning training ...")
-	
+
 	for epoch in range(NUM_EPOCHS):
 		
 		start_time = time.time()
@@ -154,49 +156,67 @@ def train(train_dataloader, trained_model_filename, yaml_data):
 		epoch_total_time += epoch_time
 
 		#average training loss
-		print(f"epoch : {epoch+1} / {NUM_EPOCHS} iter : {i} / {num_batches}, average training loss : {running_loss / num_batches}")
+		avg_loss = running_loss / num_batches
+		print(f"\nepoch : {epoch+1} / {NUM_EPOCHS} \naverage training loss : {avg_loss.item()}")
 		running_loss = 0
 		
 		#training time per epoch
-		print(f'epoch : {epoch+1} total time : {epoch_time:.2f} seconds')
+		print(f'total training time : {epoch_time:.2f} seconds')
 		# tf.summary.scalar('epoch_exe_time', epoch_time, step = epoch)
 
 		#throughput token : tokens processed per second
 		t_tps = (SEQ_LEN * BATCH_SIZE * num_batches) / epoch_time
-		print(f'epoch : {epoch+1} tokens processed per second : {t_tps:.4f}')
+		print(f'tokens processed per second : {t_tps:.4f}')
 		# tf.summary.scalar('token_throughput', t_tps, step = epoch)
 
 		#throughput input: input sequence processed per second
 		is_tps = (BATCH_SIZE * num_batches) / epoch_time
-		print(f'epoch : {epoch+1} input sequence processed per second : {is_tps:.4f}')
+		print(f'input sequence of size {SEQ_LEN} processed per second : {is_tps:.4f}')
 
-		check_gpu_memory()
-		check_cpu_memory()
+		gpu_mem, gpu_mem_max = check_gpu_memory()
+		cpu_mem              = check_cpu_memory()
+
+		tot_cpu_mem += cpu_mem
+		tot_gpu_mem += gpu_mem
 
 		print(f"lr schdl : {lr_scheduler.state_dict()}")
 
 		#save checkpoint on disk 
 		if SAVE_CHKPNT_EPOCH is not None and epoch % SAVE_CHKPNT_EPOCH == 0:
-			checkpoint_path = os.path.join(PARENT_PATH, MODEL_CHKPNT_DIR, f'{MODEL_NAME}_chkpoint_{epoch+1}.pth')
-			save_checkpoint(model, optimizer, lr_scheduler, checkpoint_path)
+			checkpoint_path = os.path.join(PARENT_PATH, MODEL_CHKPNT_DIR, f'{MODEL_NAME}_{PRECISION_TYPE}_chkpoint_{epoch+1}.pth')
+			size_in_bytes = save_checkpoint(model, optimizer, lr_scheduler, checkpoint_path)
+	
+		df_list.append([epoch+1, avg_loss.item() , epoch_time, t_tps, is_tps ])
+		df = pd.DataFrame(df_list, columns = ['epoch' , 'loss', 'training time', 'token throughput', 'input throughput' ])
+		df.to_csv( os.path.join(PARENT_PATH, log_dir, f'report_{MODEL_NAME}_{PRECISION_TYPE}.csv') , index = False)
 
 	#total training time per epoch
 	print(f'Total training Time for {NUM_EPOCHS} epoch : {epoch_total_time :.2f} seconds')
 
 	#average training time per epoch
-	print(f'Average training Time  : {epoch_total_time / NUM_EPOCHS :.2f} seconds')
+	print(f'Average training Time per epoch : {epoch_total_time / NUM_EPOCHS :.2f} seconds')
 
-	#average token throughput 
-	print(f'Average token throughput : {(SEQ_LEN * BATCH_SIZE * num_batches * NUM_EPOCHS) / epoch_total_time :.4f} tokens per second')
+	#token throughput 
+	print(f'token throughput : {(SEQ_LEN * BATCH_SIZE * num_batches * NUM_EPOCHS) / epoch_total_time :.4f} tokens per second')
 
-	#average input sequence throughput
-	print(f'Average input sequence throughput : {(BATCH_SIZE * num_batches * NUM_EPOCHS) / epoch_total_time :.4f} input sequences per second')
+	#input sequence throughput
+	print(f'input sequence throughput : {(BATCH_SIZE * num_batches * NUM_EPOCHS) / epoch_total_time :.4f} input sequences per second')
 
 	#average forward pass time per epoch
-	print(f'Average forward pass Time : {forward_total_time / NUM_EPOCHS :.2f} seconds')
+	print(f'Average forward pass Time per epoch : {forward_total_time / NUM_EPOCHS :.2f} seconds')
 
 	#average backward pass time per epoch
-	print(f'Average backward pass Time : {backward_total_time / NUM_EPOCHS :.2f} seconds')
+	print(f'Average backward pass Time per epoch : {backward_total_time / NUM_EPOCHS :.2f} seconds')
+
+	#average gpu memory consumption per epoch
+	print(f'Average gpu memory consumption per epoch: {tot_gpu_mem / NUM_EPOCHS :.2f} bytes')
+
+	#average cpu memory consumption per epoch
+	print(f'Average cpu memory consumption per epoch: {tot_cpu_mem / NUM_EPOCHS :.2f} bytes')
+
+	#maximum gpu memory consumed
+	print(f'maximum gpu memory consumed : { gpu_mem_max:.2f} bytes')
+
 
 	return model
 
@@ -232,11 +252,11 @@ def eval(model, eval_dataloader, model_chkpnt, yaml_data):
 	MODEL_NAME        = yaml_data['MODEL_NAME']
 
 	device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
-	metric = None#evaluate.load("accuracy")	
+	metric = None #evaluate.load("accuracy")	
 
-	if model_chkpnt != None:
+	if model is None and model_chkpnt != None:
 		model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
-		model = load_checkpoint(model, model_chkpnt)
+		model , optimizer, lr_scheduler,= load_checkpoint(model, None, None, model_chkpnt)
 
 	model.eval()
 
@@ -245,7 +265,7 @@ def eval(model, eval_dataloader, model_chkpnt, yaml_data):
 		with torch.no_grad():
 			outputs = model(**batch)
 
-	logits = outputs.logits
+	logits      = outputs.logits
 	predictions = torch.argmax(logits, dim=-1)
 	metric.add_batch(predictions=predictions, references=batch["labels"])
 
@@ -266,6 +286,9 @@ def loadModel(yaml_data):
 	print(f"\nloading model {MODEL_NAME}")
 	model = AutoModelForCausalLM.from_pretrained(MODEL_NAME, low_cpu_mem_usage = True)
 	return model
+
+def model_quantization():
+	pass
 
 def main():
 	yaml_data  = config()
