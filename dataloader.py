@@ -27,7 +27,7 @@ def getDataloaders(data, yaml_data):
 
 def getDataset(yaml_data):
 
-	print(f'in getDataset')
+	print(f'\nin getDataset')
 	#arguments
 	DATASET_NAME = yaml_data['DATASET_NAME']
 	SEED         = int(yaml_data['SEED'])

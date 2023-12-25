@@ -20,7 +20,7 @@ from torch.cuda.amp import autocast
 from torch.cuda.amp import GradScaler 
 
 import psutil
-
+import pandas as pd
 
 log_dir = "logs"  # Specify the directory where you want to store the logs
 # summary_writer = tf.summary.create_file_writer(log_dir)
@@ -30,7 +30,7 @@ PARENT_PATH  = os.getcwd()
 
 def train(train_dataloader, trained_model_filename, yaml_data):
 
-	print("\nstarting def train")
+	print("\in train")
 	#arguments
 	MODEL_NAME        = yaml_data['MODEL_NAME']
 	NUM_EPOCHS        = int(yaml_data['NUM_EPOCHS'])
@@ -46,8 +46,8 @@ def train(train_dataloader, trained_model_filename, yaml_data):
 	device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 	
 	print(f"MODEL_NAME : {MODEL_NAME}\nNUM_EPOCHS : {NUM_EPOCHS} \nLR : {LR}\nSAVE_CHKPNT_EPOCH : {SAVE_CHKPNT_EPOCH} \
-	   MODEL_CHKPNT_DIR : {MODEL_CHKPNT_DIR}\nSEQ_LEN : {SEQ_LEN}\nBATCH_SIZE : {BATCH_SIZE}\nOPTIMIZER_NAME : {OPTIMIZER_NAME}\ndevice : {device}\nOPT_LEVEL : {OPT_LVL}\n\
-	   PRECISION_TYPE:{PRECISION_TYPE}\n")
+	   \nMODEL_CHKPNT_DIR : {MODEL_CHKPNT_DIR}\nSEQ_LEN : {SEQ_LEN}\nBATCH_SIZE : {BATCH_SIZE}\nOPTIMIZER_NAME : {OPTIMIZER_NAME}\ndevice : {device}\nOPT_LEVEL : {OPT_LVL} \
+	   \nPRECISION_TYPE:{PRECISION_TYPE}\n")
 	
 	num_batches = len(train_dataloader)
 	step = 0
@@ -161,10 +161,14 @@ def train(train_dataloader, trained_model_filename, yaml_data):
 		print(f'epoch : {epoch+1} total time : {epoch_time:.2f} seconds')
 		# tf.summary.scalar('epoch_exe_time', epoch_time, step = epoch)
 
-		#throughput : tokens processed per second
-		t_tps = epoch_time / (SEQ_LEN * BATCH_SIZE * num_batches)
-		print(f'epoch : {epoch+1} tokens processed per second : {t_tps:.4f} seconds')
+		#throughput token : tokens processed per second
+		t_tps = (SEQ_LEN * BATCH_SIZE * num_batches) / epoch_time
+		print(f'epoch : {epoch+1} tokens processed per second : {t_tps:.4f}')
 		# tf.summary.scalar('token_throughput', t_tps, step = epoch)
+
+		#throughput input: input sequence processed per second
+		is_tps = (BATCH_SIZE * num_batches) / epoch_time
+		print(f'epoch : {epoch+1} input sequence processed per second : {is_tps:.4f}')
 
 		check_gpu_memory()
 		check_cpu_memory()
@@ -180,13 +184,19 @@ def train(train_dataloader, trained_model_filename, yaml_data):
 	print(f'Total training Time for {NUM_EPOCHS} epoch : {epoch_total_time :.2f} seconds')
 
 	#average training time per epoch
-	print(f'Average training Time per epoch : {epoch_total_time / NUM_EPOCHS :.2f} seconds')
+	print(f'Average training Time  : {epoch_total_time / NUM_EPOCHS :.2f} seconds')
+
+	#average token throughput 
+	print(f'Average token throughput : {(SEQ_LEN * BATCH_SIZE * num_batches * NUM_EPOCHS) / epoch_total_time :.4f} tokens per second')
+
+	#average input sequence throughput
+	print(f'Average input sequence throughput : {(BATCH_SIZE * num_batches * NUM_EPOCHS) / epoch_total_time :.4f} input sequences per second')
 
 	#average forward pass time per epoch
-	print(f'Average forward pass Time per epoch : {forward_total_time / NUM_EPOCHS :.2f} seconds')
+	print(f'Average forward pass Time : {forward_total_time / NUM_EPOCHS :.2f} seconds')
 
 	#average backward pass time per epoch
-	print(f'Average backward pass Time per epoch : {backward_total_time / NUM_EPOCHS :.2f} seconds')
+	print(f'Average backward pass Time : {backward_total_time / NUM_EPOCHS :.2f} seconds')
 
 	return model
 
