@@ -209,13 +209,13 @@ def train(train_dataloader, trained_model_filename, yaml_data):
 	print(f'Average backward pass Time per epoch : {backward_total_time / NUM_EPOCHS :.2f} seconds')
 
 	#average gpu memory consumption per epoch
-	print(f'Average gpu memory consumption per epoch: {tot_gpu_mem / NUM_EPOCHS :.2f} bytes')
+	print(f'Average gpu memory consumption per epoch: {tot_gpu_mem / NUM_EPOCHS :.4f} MB')
 
 	#average cpu memory consumption per epoch
-	print(f'Average cpu memory consumption per epoch: {tot_cpu_mem / NUM_EPOCHS :.2f} bytes')
+	print(f'Average cpu memory consumption per epoch: {tot_cpu_mem / NUM_EPOCHS :.4f} MB')
 
 	#maximum gpu memory consumed
-	print(f'maximum gpu memory consumed : { gpu_mem_max:.2f} bytes')
+	print(f'maximum gpu memory consumed : { gpu_mem_max:.4f} MB')
 
 
 	return model
