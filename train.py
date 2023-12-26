@@ -1,6 +1,6 @@
 #train.py
 from dataloader import getDataset, getDataloaders
-from helpers.helper import check_cpu_memory, check_gpu_memory, save_checkpoint, load_checkpoint, FX_graph_mode_quantization
+from helpers.helper import check_cpu_memory, check_gpu_memory, save_checkpoint, load_checkpoint, set_seed
 
 import yaml
 import os
@@ -26,6 +26,7 @@ log_dir = "logs"  # Specify the directory where you want to store the logs
 
 YAML_PATH = 'config.yaml'
 PARENT_PATH  = os.getcwd()
+
 
 def train(train_dataloader, trained_model_filename, yaml_data):
 
@@ -290,8 +291,13 @@ def loadModel(yaml_data):
 
 
 def main():
+
 	yaml_data  = config()
 	print(yaml_data)
+	
+	SEED  = int(yaml_data['SEED'])
+
+	set_seed(SEED)
 
 	# set trained_model_filename if need to use a pretrained checkpoint ; else keep None
 	trained_model_filename = None

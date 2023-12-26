@@ -9,8 +9,19 @@ from torch.ao.quantization import (
 import torch.ao.quantization.quantize_fx as quantize_fx
 import copy
 
+from torch.quantization import per_channel_dynamic_qconfig
+from torch.quantization import quantize_dynamic_jit
+
+import random
+import numpy as np
 import psutil
 import os
+
+def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+
 
 def check_gpu_memory():
 	gpu_mem = torch.cuda.memory_allocated() / 1e6
