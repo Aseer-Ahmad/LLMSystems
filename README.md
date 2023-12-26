@@ -36,7 +36,9 @@ USEFUL LINKS :
 8. https://www.cerebras.net/machine-learning/to-bfloat-or-not-to-bfloat-that-is-the-question/#:~:text=bfloat16%20is%20a%2016%2Dbit,deep%20learning%20applications%20in%20mind. <br>
 9. https://github.com/NVIDIA/apex <br>
 10. https://pytorch.org/docs/stable/quantization.html <br>
-11. 
+11. https://pytorch.org/tutorials/intermediate/dynamic_quantization_bert_tutorial.html <br>
+12. https://pytorch.org/tutorials/prototype/graph_mode_dynamic_bert_tutorial.html <br>
+
 
 
 INSTRUCTIONS TO RUN : 
