@@ -301,17 +301,18 @@ def main():
 	train_dataloader, eval_dataloader = getDataloaders(data, yaml_data)
 	
 	# train model
-	# model = train(train_dataloader, trained_model_filename,  yaml_data)
+	model = train(train_dataloader, trained_model_filename,  yaml_data)
 	
 	# eval(model, eval_dataloader, trained_model_filename, yaml_data)
 
 	# quantization attempt
-	model = loadModel(yaml_data)
-	example_batch = next(iter(train_dataloader))
+	
+	# model = loadModel(yaml_data)
+	# example_batch = next(iter(train_dataloader))
 	# del example_batch['input_ids']
 	# del example_batch['attention_mask']
 	# model_quantized = FX_graph_mode_quantization(model, example_batch)
-	print(model)
+	# print(model)
 
 
 if __name__ == '__main__':
