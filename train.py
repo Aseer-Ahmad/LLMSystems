@@ -1,11 +1,11 @@
 #train.py
 from dataloader import getDataset, getDataloaders
-from helpers.helper import check_cpu_memory, check_gpu_memory, save_checkpoint, load_checkpoint, set_seed
+from helpers.helper import check_cpu_memory, check_gpu_memory, save_checkpoint, load_checkpoint, set_seed, dynamic_quantization
 
 import yaml
 import os
 import time
-
+import sys
 # import tensorflow as tf
 
 from transformers import AutoModelForCausalLM, TrainingArguments, Trainer
@@ -300,20 +300,32 @@ def main():
 	set_seed(SEED)
 
 	# set trained_model_filename if need to use a pretrained checkpoint ; else keep None
-	trained_model_filename = None
-
+	# eg:  'gpt2_SINGLE_chkpoint_4'
+	trained_model_filename = None  
 	# load dataset
 	data = getDataset(yaml_data)
 	train_dataloader, eval_dataloader = getDataloaders(data, yaml_data)
 	
 	# train model
-	model = train(train_dataloader, trained_model_filename,  yaml_data)
+	# model = train(train_dataloader, trained_model_filename,  yaml_data)
 	
 	# eval(model, eval_dataloader, trained_model_filename, yaml_data)
 
 	# quantization attempt
-	
+	# attempt 1 
 	# model = loadModel(yaml_data)
+	# MODEL_CHKPNT_DIR  = yaml_data['MODEL_CHKPNT_DIR']
+	# checkpoint_path = os.path.join(PARENT_PATH, MODEL_CHKPNT_DIR, 'SINGLE', 'gpt2_SINGLE_chkpoint_4.pth')
+	# model = load_checkpoint(model, None, None, checkpoint_path)
+	# model_quantize = dynamic_quantization(model)
+	# checkpoint_path = os.path.join(PARENT_PATH, MODEL_CHKPNT_DIR, 'SINGLE', 'gpt2_SINGLE_chkpoint_4_quantized.pth')
+	# torch.save({
+	# 	'model_state_dict': model_quantize.state_dict()
+	# }, checkpoint_path)
+	# size_in_bytes = os.path.getsize(checkpoint_path)
+	# print(f"{checkpoint_path} : {size_in_bytes} bytes")
+
+	# attempt 2
 	# example_batch = next(iter(train_dataloader))
 	# del example_batch['input_ids']
 	# del example_batch['attention_mask']

@@ -82,7 +82,13 @@ def eager_mode_quantization(model):
 	pass
 
 def dynamic_quantization(model):
-	pass
+	quantized_model = torch.quantization.quantize_dynamic(
+   						model, {torch.nn.Linear, torch.nn.Conv1d}, dtype=torch.qint8)
+	
+	return quantized_model
+
+def print_size_of_model(model_chkpnt):
+    print('Model Size (MB):', os.path.getsize(model_chkpnt)/1e6)
 
 def metric1():
 	pass
