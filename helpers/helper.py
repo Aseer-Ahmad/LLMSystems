@@ -70,6 +70,9 @@ def FX_graph_mode_quantization(model, input):
 def eager_mode_quantization(model):
 	pass
 
+def dynamic_quantization(model):
+	pass
+
 def metric1():
 	pass
 	
