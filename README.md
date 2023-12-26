@@ -39,3 +39,9 @@ USEFUL LINKS :
 11. 
 
 
+INSTRUCTIONS TO RUN : 
+
+1. Open config.yaml
+2. change MODEL_CHKPNT_DIR path to suit for Windows/Ubuntu
+3. run train.py
+
