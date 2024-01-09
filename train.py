@@ -1,6 +1,6 @@
 #train.py
 from dataloader import getDataset, getDataloaders
-from helpers.helper import check_cpu_memory, check_gpu_memory, save_checkpoint, load_checkpoint, set_seed, dynamic_quantization
+from helpers.helper import check_cpu_memory, check_gpu_memory, save_checkpoint, load_checkpoint, set_seed, dynamic_quantization,check_model_size
 
 import yaml
 import os
@@ -72,7 +72,7 @@ def train(train_dataloader, trained_model_filename, yaml_data):
 	# model, optimizer = amp.initialize(model, optimizer, opt_level = OPT_LVL)
 
 	if trained_model_filename != None:
-		model_chkpnt = os.path.join(yaml_data['MODEL_CHKPNT_DIR'], f'{trained_model_filename}.pth')  
+		model_chkpnt = os.path.join(PARENT_PATH, yaml_data['MODEL_CHKPNT_DIR'], trained_model_filename)  
 		model , optimizer, lr_scheduler = load_checkpoint(model, optimizer, lr_scheduler, model_chkpnt)	
 		print(f'{MODEL_NAME} loaded from {model_chkpnt}')
 
@@ -247,30 +247,71 @@ def get_schdlr(optimizer, num_training_steps):
 
 	return lr_scheduler
 
-def eval(model, eval_dataloader, model_chkpnt, yaml_data):
+def eval(model, eval_dataloader, model_chkpnt, quantize, yaml_data):
 	
+	print("starting eval ...")
+
 	#arguments
 	MODEL_NAME        = yaml_data['MODEL_NAME']
+	MODEL_CHKPNT_DIR  = yaml_data['MODEL_CHKPNT_DIR']
+	SEQ_LEN           = int(yaml_data['SEQ_LEN'])
+	BATCH_SIZE		  = int(yaml_data['BATCH_SIZE'])
 
 	device = torch.device("cuda") if torch.cuda.is_available() else torch.device("cpu")
 	metric = None #evaluate.load("accuracy")	
+
+	model_chkpnt = os.path.join(PARENT_PATH, MODEL_CHKPNT_DIR, model_chkpnt)
 
 	if model is None and model_chkpnt != None:
 		model = AutoModelForCausalLM.from_pretrained(MODEL_NAME)
 		model , optimizer, lr_scheduler,= load_checkpoint(model, None, None, model_chkpnt)
 
+	if quantize : 
+		print("model size before quantization")
+		check_model_size(model)
+		print(model)
+		model = dynamic_quantization(model)
+		device = torch.device("cpu")
+		print(model)
+		print("model size after quantization")
+		check_model_size(model)
+
+	model.to(device)
 	model.eval()
 
+	num_batches = len(eval_dataloader)
+	count = 1
+	running_loss = 0
+
+	st = time.time()
 	for batch in eval_dataloader:
 		batch = {k: v.to(device) for k, v in batch.items()}
 		with torch.no_grad():
-			outputs = model(**batch)
+			outputs 	= model(**batch)
+			loss		= outputs.loss
+			running_loss += loss
 
-	logits      = outputs.logits
-	predictions = torch.argmax(logits, dim=-1)
-	metric.add_batch(predictions=predictions, references=batch["labels"])
+			print(f"batch : {count}/{num_batches} loss : {loss}")
+			count += 1
 
-	metric.compute()
+			# logits      = outputs.logits
+			# predictions = torch.argmax(logits, dim=-1)
+			# metric.add_batch(predictions=predictions, references=batch["labels"])
+			# metric.compute()
+
+	et =  time.time()
+	run_time = et - st
+
+	gpu_mem, gpu_mem_max = check_gpu_memory()
+	cpu_mem              = check_cpu_memory()
+
+	#token throughput 
+	print(f'total running time : {run_time} seconds')
+	print(f'token throughput : {(SEQ_LEN * BATCH_SIZE * num_batches ) / run_time :.4f} tokens per second')
+	print(f"average loss : {running_loss / num_batches}")
+
+	check_model_size(model)
+		
 
 def config():
     # Read the YAML file
@@ -300,40 +341,21 @@ def main():
 	set_seed(SEED)
 
 	# set trained_model_filename if need to use a pretrained checkpoint ; else keep None
-	# eg:  'gpt2_SINGLE_chkpoint_4'
-	trained_model_filename = None  
-	# load dataset
+	# eg:  'gpt2_SINGLE_chkpoint_4.pth'
+	trained_model_filename = 'gpt2_SINGLE_chkpoint_10.pth'  
 	data = getDataset(yaml_data)
 	train_dataloader, eval_dataloader = getDataloaders(data, yaml_data)
-	
-	# train model
-	# model = train(train_dataloader, trained_model_filename,  yaml_data)
-	
-	# eval(model, eval_dataloader, trained_model_filename, yaml_data)
+	model = train(train_dataloader, trained_model_filename,  yaml_data)
+	# quantize = True
+	# eval(None, eval_dataloader, trained_model_filename, quantize, yaml_data)
 
 	# quantization attempt
-	# attempt 1
-	model = loadModel(yaml_data)
-	MODEL_CHKPNT_DIR  = yaml_data['MODEL_CHKPNT_DIR']
-	checkpoint_path = os.path.join( PARENT_PATH, MODEL_CHKPNT_DIR, 'SINGLE', 'gpt2_SINGLE_chkpoint_7.pth')
 	
-	model, _, _  = load_checkpoint(model, None, None, checkpoint_path)
-
-	model_quantize = dynamic_quantization(model)
-	
-	# checkpoint_path = os.path.join( PARENT_PATH, MODEL_CHKPNT_DIR, 'SINGLE', 'gpt2_SINGLE_chkpoint_4_quantized.pth')
-	# torch.save({
-	# 	'model_state_dict': model_quantize.state_dict()
-	# }, checkpoint_path)
-	# size_in_bytes = os.path.getsize(checkpoint_path)
-	# print(f"{checkpoint_path} : {size_in_bytes} bytes")
-
-	# attempt 2
-	# example_batch = next(iter(train_dataloader))
-	# del example_batch['input_ids']
-	# del example_batch['attention_mask']
-	# model_quantized = FX_graph_mode_quantization(model, example_batch)
-	# print(model)
+	# model = loadModel(yaml_data)
+	# MODEL_CHKPNT_DIR  = yaml_data['MODEL_CHKPNT_DIR']
+	# checkpoint_path = os.path.join( PARENT_PATH, MODEL_CHKPNT_DIR, 'SINGLE', 'gpt2_SINGLE_chkpoint_7.pth')
+	# model, _, _  = load_checkpoint(model, None, None, checkpoint_path)
+	# model_quantize = dynamic_quantization(model)
 
 
 if __name__ == '__main__':

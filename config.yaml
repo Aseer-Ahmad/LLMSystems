@@ -1,5 +1,5 @@
 MODEL_NAME : gpt2
-MODEL_CHKPNT_DIR : models\gpt2\
+MODEL_CHKPNT_DIR : models\gpt2\SINGLE\
 TOKENIZER  : gpt2
 
 DATASET_NAME  : databricks/databricks-dolly-15k

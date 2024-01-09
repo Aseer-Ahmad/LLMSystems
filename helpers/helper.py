@@ -78,9 +78,6 @@ def FX_graph_mode_quantization(model, input):
 
 	return model_quantized
 
-def eager_mode_quantization(model):
-	pass
-
 def dynamic_quantization(model):
 	quantized_model = torch.quantization.quantize_dynamic(
    						model, {torch.nn.Linear, torch.nn.Conv1d}, dtype=torch.qint8)
@@ -98,8 +95,15 @@ def static_quantization(model):
 	model_int8 = torch.ao.quantization.convert(model_fp32_prepared)
 	return model_int8
 
-def print_size_of_model(model_chkpnt):
-    print('Model Size (MB):', os.path.getsize(model_chkpnt)/1e6)
+def check_model_size(model):
+	PARENT_PATH = os.getcwd()
+	MODEL_PATH  = os.path.join(PARENT_PATH, 'temp.pth')
+	torch.save({
+		'model' : model.state_dict()
+	}, MODEL_PATH)
+	print('Model Size (MB):', os.path.getsize(MODEL_PATH)/1e6)
+	os.remove(MODEL_PATH)
+
 
 def metric1():
 	pass
