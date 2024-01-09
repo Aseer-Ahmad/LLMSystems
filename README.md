@@ -38,7 +38,7 @@ USEFUL LINKS :
 10. https://pytorch.org/docs/stable/quantization.html <br>
 11. https://pytorch.org/tutorials/intermediate/dynamic_quantization_bert_tutorial.html <br>
 12. https://pytorch.org/tutorials/prototype/graph_mode_dynamic_bert_tutorial.html <br>
-
+13. https://pytorch.org/docs/stable/quantization.html
 
 
 INSTRUCTIONS TO RUN : 
