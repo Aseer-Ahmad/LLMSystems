@@ -312,13 +312,16 @@ def main():
 	# eval(model, eval_dataloader, trained_model_filename, yaml_data)
 
 	# quantization attempt
-	# attempt 1 
-	# model = loadModel(yaml_data)
-	# MODEL_CHKPNT_DIR  = yaml_data['MODEL_CHKPNT_DIR']
-	# checkpoint_path = os.path.join(PARENT_PATH, MODEL_CHKPNT_DIR, 'SINGLE', 'gpt2_SINGLE_chkpoint_4.pth')
-	# model = load_checkpoint(model, None, None, checkpoint_path)
-	# model_quantize = dynamic_quantization(model)
-	# checkpoint_path = os.path.join(PARENT_PATH, MODEL_CHKPNT_DIR, 'SINGLE', 'gpt2_SINGLE_chkpoint_4_quantized.pth')
+	# attempt 1
+	model = loadModel(yaml_data)
+	MODEL_CHKPNT_DIR  = yaml_data['MODEL_CHKPNT_DIR']
+	checkpoint_path = os.path.join( PARENT_PATH, MODEL_CHKPNT_DIR, 'SINGLE', 'gpt2_SINGLE_chkpoint_7.pth')
+	
+	model, _, _  = load_checkpoint(model, None, None, checkpoint_path)
+
+	model_quantize = dynamic_quantization(model)
+	
+	# checkpoint_path = os.path.join( PARENT_PATH, MODEL_CHKPNT_DIR, 'SINGLE', 'gpt2_SINGLE_chkpoint_4_quantized.pth')
 	# torch.save({
 	# 	'model_state_dict': model_quantize.state_dict()
 	# }, checkpoint_path)

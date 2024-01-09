@@ -87,6 +87,17 @@ def dynamic_quantization(model):
 	
 	return quantized_model
 
+
+def static_quantization(model):
+	model.eval()
+	model.qconfig = torch.ao.quantization.get_default_qconfig('x86')
+	model_fp32_fused = torch.ao.quantization.fuse_modules(model, [['conv', 'relu']])
+	model_fp32_prepared = torch.ao.quantization.prepare(model_fp32_fused)
+	# calibrate : pass through model_prepared example batch
+	# model(**example_batch)
+	model_int8 = torch.ao.quantization.convert(model_fp32_prepared)
+	return model_int8
+
 def print_size_of_model(model_chkpnt):
     print('Model Size (MB):', os.path.getsize(model_chkpnt)/1e6)
 
